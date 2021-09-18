@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import argparse
 import ast
+import difflib
 import re
 import sys
 import tokenize
+from datetime import datetime
 from typing import Match
 from typing import Sequence
 
@@ -329,9 +331,22 @@ def _fix_file(filename: str, args: argparse.Namespace) -> int:
     if filename == '-':
         print(contents_text, end='')
     elif contents_text != contents_text_orig:
-        print(f'Rewriting {filename}', file=sys.stderr)
-        with open(filename, 'w', encoding='UTF-8', newline='') as f:
-            f.write(contents_text)
+        if args.diff_only:
+            now = str(datetime.now())
+            diff_output = difflib.unified_diff(
+                contents_text_orig.splitlines(keepends=True),
+                contents_text.splitlines(keepends=True),
+                fromfile=f"a/{filename}",
+                tofile=f"b/{filename}",
+                fromfiledate=now,
+                tofiledate=now,
+            )
+            print("".join(diff_output), end="")
+
+        else:
+            print(f'Rewriting {filename}', file=sys.stderr)
+            with open(filename, 'w', encoding='UTF-8', newline='') as f:
+                f.write(contents_text)
 
     if args.exit_zero_even_if_changed:
         return 0
@@ -346,6 +361,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument('--keep-percent-format', action='store_true')
     parser.add_argument('--keep-mock', action='store_true')
     parser.add_argument('--keep-runtime-typing', action='store_true')
+    parser.add_argument('--diff-only', action='store_true')
     parser.add_argument(
         '--py3-plus', '--py3-only',
         action='store_const', dest='min_version', default=(3,), const=(3,),
